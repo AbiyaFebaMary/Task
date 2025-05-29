@@ -99,18 +99,18 @@ final class APIService {
     @available(iOS 15.0, *)
     func fetchSpeciesAsync() async throws -> [Species] {
         guard let request = makeRequest(for: .species) else {
-            throw APIError.invalidURL
+            throw APIError.requestFailed("Invalid URL")
         }
         
         do {
             let (data, response) = try await session.data(for: request)
             
             guard let httpResponse = response as? HTTPURLResponse else {
-                throw APIError.networkError(NSError(domain: "No HTTP response", code: -1, userInfo: nil))
+                throw APIError.requestFailed("No HTTP response")
             }
             
             if httpResponse.statusCode >= 400 {
-                throw APIError.serverError(httpResponse.statusCode)
+                throw APIError.responseFailed("Server error with code: \(httpResponse.statusCode)")
             }
             
             #if DEBUG
@@ -124,22 +124,8 @@ final class APIService {
             } catch {
                 #if DEBUG
                 print("Decoding error: \(error)")
-                if let decodingError = error as? DecodingError {
-                    switch decodingError {
-                    case .keyNotFound(let key, let context):
-                        print("Key '\(key.stringValue)' not found: \(context.debugDescription)")
-                    case .typeMismatch(let type, let context):
-                        print("Type mismatch for type \(type): \(context.debugDescription)")
-                    case .valueNotFound(let type, let context):
-                        print("Value of type \(type) not found: \(context.debugDescription)")
-                    case .dataCorrupted(let context):
-                        print("Data corrupted: \(context.debugDescription)")
-                    @unknown default:
-                        print("Unknown decoding error: \(decodingError)")
-                    }
-                }
                 #endif
-                throw APIError.decodingError(error)
+                throw APIError.responseFailed("Failed to decode response: \(error.localizedDescription)")
             }
         } catch {
             if let apiError = error as? APIError {
@@ -148,7 +134,7 @@ final class APIService {
                 #if DEBUG
                 print("Network error: \(error)")
                 #endif
-                throw APIError.networkError(error)
+                throw APIError.requestFailed("Network error: \(error.localizedDescription)")
             }
         }
     }
