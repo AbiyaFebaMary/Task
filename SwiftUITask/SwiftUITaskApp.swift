@@ -11,7 +11,7 @@ import SwiftUI
 struct SwiftUITaskApp: App {
     var body: some Scene {
         WindowGroup {
-            SplashView()
+            SplashScreen()
         }
     }
 }
