@@ -29,6 +29,23 @@
 		0FD1F9652DE7802B00345F57 /* SwiftUITaskUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SwiftUITaskUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		0FD1F98A2DE7847F00345F57 /* Exceptions for "SplashScreen " folder in "SwiftUITask" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				SplashView.swift,
+			);
+			target = 0FD1F94A2DE7802900345F57 /* SwiftUITask */;
+		};
+		0FD1F98B2DE7847F00345F57 /* Exceptions for "SplashScreen " folder in "SwiftUITaskUITests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				SplashView.swift,
+			);
+			target = 0FD1F9642DE7802B00345F57 /* SwiftUITaskUITests */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		0FD1F94D2DE7802900345F57 /* SwiftUITask */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
@@ -43,6 +60,15 @@
 		0FD1F9682DE7802B00345F57 /* SwiftUITaskUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = SwiftUITaskUITests;
+			sourceTree = "<group>";
+		};
+		0FD1F9872DE7847F00345F57 /* SplashScreen  */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				0FD1F98A2DE7847F00345F57 /* Exceptions for "SplashScreen " folder in "SwiftUITask" target */,
+				0FD1F98B2DE7847F00345F57 /* Exceptions for "SplashScreen " folder in "SwiftUITaskUITests" target */,
+			);
+			path = "SplashScreen ";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -76,6 +102,7 @@
 			isa = PBXGroup;
 			children = (
 				0FD1F94D2DE7802900345F57 /* SwiftUITask */,
+				0FD1F9872DE7847F00345F57 /* SplashScreen  */,
 				0FD1F95E2DE7802B00345F57 /* SwiftUITaskTests */,
 				0FD1F9682DE7802B00345F57 /* SwiftUITaskUITests */,
 				0FD1F94C2DE7802900345F57 /* Products */,
@@ -155,6 +182,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				0FD1F9682DE7802B00345F57 /* SwiftUITaskUITests */,
+				0FD1F9872DE7847F00345F57 /* SplashScreen  */,
 			);
 			name = SwiftUITaskUITests;
 			packageProductDependencies = (

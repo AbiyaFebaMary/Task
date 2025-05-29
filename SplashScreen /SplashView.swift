@@ -18,7 +18,7 @@ struct SplashView: View {
                     .font(.system(size: 80))
                     .foregroundColor(.white)
                     .scaleEffect(isAnimating ? 1.2 : 1.0)
-                    .rotationEffect(.degrees(isAnimating ? 360 : 0))
+//                    .rotationEffect(.degrees(isAnimating ? 90 : 0))
                     .animation(
                         Animation.easeInOut(duration: 1.5)
                             .repeatForever(autoreverses: false),
