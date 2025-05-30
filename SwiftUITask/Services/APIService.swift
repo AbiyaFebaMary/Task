@@ -7,6 +7,7 @@
 
 import Foundation
 import Combine
+import SwiftData
 
 // MARK: - API Error Types
 enum APIError: Error, LocalizedError {
@@ -29,15 +30,16 @@ final class APIService {
     private let baseURL = "https://aes.shenlu.me/api/v1"
     private let jsonDecoder = JSONDecoder()
     private let session = URLSession.shared
+    private let itemsPerPage = 20
     
     // MARK: - Endpoints
     private enum Endpoint {
-        case species
+        case species(page: Int)
         
         var path: String {
             switch self {
-            case .species:
-                return "/species"
+            case .species(let page):
+                return "/species?page=\(page)&per_page=20"
             }
         }
     }
@@ -55,8 +57,8 @@ final class APIService {
     }
     
     // MARK: - Public Methods
-    func fetchSpecies() -> AnyPublisher<[Species], Error> {
-        guard let request = makeRequest(for: .species) else {
+    func fetchSpecies(page: Int = 1) -> AnyPublisher<[APISpeciesResponse], Error> {
+        guard let request = makeRequest(for: .species(page: page)) else {
             return Fail(error: APIError.requestFailed("Invalid URL")).eraseToAnyPublisher()
         }
         
@@ -79,7 +81,7 @@ final class APIService {
                 
                 return data
             }
-            .decode(type: [Species].self, decoder: jsonDecoder)
+            .decode(type: [APISpeciesResponse].self, decoder: jsonDecoder)
             .mapError { error in
                 #if DEBUG
                 print("Error: \(error)")
@@ -97,8 +99,8 @@ final class APIService {
     }
     
     @available(iOS 15.0, *)
-    func fetchSpeciesAsync() async throws -> [Species] {
-        guard let request = makeRequest(for: .species) else {
+    func fetchSpeciesAsync(page: Int = 1) async throws -> [APISpeciesResponse] {
+        guard let request = makeRequest(for: .species(page: page)) else {
             throw APIError.requestFailed("Invalid URL")
         }
         
@@ -120,7 +122,7 @@ final class APIService {
             #endif
             
             do {
-                return try jsonDecoder.decode([Species].self, from: data)
+                return try jsonDecoder.decode([APISpeciesResponse].self, from: data)
             } catch {
                 #if DEBUG
                 print("Decoding error: \(error)")

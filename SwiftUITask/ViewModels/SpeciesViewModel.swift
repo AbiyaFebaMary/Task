@@ -5,89 +5,176 @@
 //  Created by AbiyaFeba on 28/05/25.
 //
 
-
 import Foundation
 import Combine
+import SwiftData
 import SwiftUI
 
-// MARK: - Species View Model
-final class SpeciesViewModel: ObservableObject {
-
-    @Published var searchText = ""
-    @Published private(set) var species: [Species] = []
-    @Published private(set) var isLoading = false
-    @Published private(set) var errorMessage: String?
+@MainActor
+class SpeciesViewModel: ObservableObject {
+    // MARK: - Published Properties
+    @Published var searchText: String = ""
+    @Published var filteredSpecies: [Species] = []
+    @Published var isLoading: Bool = false
+    @Published var errorMessage: String? = nil
+    @Published var currentPage: Int = 1
+    @Published var hasMorePages: Bool = true
     
-    private let apiService: APIService
+    // MARK: - Private Properties
+    private var apiService = APIService()
     private var cancellables = Set<AnyCancellable>()
+    private var searchCancellable: AnyCancellable?
+    private var modelContext: ModelContext?
+    private var speciesDescriptor: FetchDescriptor<Species>?
     
-    init(apiService: APIService = APIService()) {
-        self.apiService = apiService
-        setupBindings()
+    // MARK: - Initialization
+    init(modelContext: ModelContext? = nil) {
+        self.modelContext = modelContext
+        setupSearchSubscription()
+        loadLocalData()
+        fetchSpecies()
+    }
+    
+    // MARK: - Public Methods
+    func setModelContext(_ context: ModelContext) {
+        self.modelContext = context
+        loadLocalData()
+    }
+    
+    func loadNextPage() {
+        if !isLoading && hasMorePages {
+            currentPage += 1
+            fetchSpecies()
+        }
+    }
+    
+    func refresh() {
+        currentPage = 1
+        hasMorePages = true
+        fetchSpecies(forceRefresh: true)
+    }
+    
+
+    
+    func fetchSpecies(forceRefresh: Bool = false) {
+        if isLoading && !forceRefresh { return }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        apiService.fetchSpecies(page: currentPage)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] completion in
+                self?.isLoading = false
+                if case .failure(let error) = completion {
+                    self?.handleError(error)
+                }
+            } receiveValue: { [weak self] speciesResponses in
+                guard let self = self else { return }
+                
+
+                if speciesResponses.isEmpty {
+                    self.hasMorePages = false
+                    return
+                }
+                
+
+                self.saveToSwiftData(speciesResponses: speciesResponses, page: self.currentPage)
+                
+
+                self.loadLocalData()
+            }
+            .store(in: &cancellables)
     }
     
     // MARK: - Private Methods
-    private func setupBindings() {
-        $searchText
-            .debounce(for: .seconds(0.5), scheduler: DispatchQueue.main)
+    private func setupSearchSubscription() {
+        searchCancellable = $searchText
+            .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
+            .removeDuplicates()
             .sink { [weak self] _ in
-                self?.objectWillChange.send()
+                self?.applySearchFilter()
             }
-            .store(in: &cancellables)
+    }
+    
+    private func loadLocalData() {
+        guard let modelContext = modelContext else { return }
+        
+        do {
+            let descriptor = FetchDescriptor<Species>(sortBy: [SortDescriptor(\Species.commonName)])
+            let localSpecies = try modelContext.fetch(descriptor)
+            
+
+            if currentPage == 1 && !localSpecies.isEmpty {
+
+                if let maxPage = localSpecies.map({ $0.page }).max() {
+                    currentPage = maxPage
+                }
+            }
+            
+            applySearchFilter(localSpecies: localSpecies)
+        } catch {
+            print("Error fetching from SwiftData: \(error)")
+            errorMessage = "Failed to load saved data"
+        }
+    }
+    
+    private func saveToSwiftData(speciesResponses: [APISpeciesResponse], page: Int) {
+        guard let modelContext = modelContext else { return }
+        
+        for response in speciesResponses {
+
+            let descriptor = FetchDescriptor<Species>(predicate: #Predicate { $0.id == response.id })
+            
+            do {
+                let existingSpecies = try modelContext.fetch(descriptor)
+                
+                if let existing = existingSpecies.first {
+
+                    existing.commonName = response.commonName
+                    existing.scientificName = response.scientificName
+                    existing.group = response.group
+                    existing.conservationStatus = response.conservationStatus
+                    existing.isoCode = response.isoCode
+                    existing.timestamp = Date()
+                    existing.page = page
+                } else {
+
+                    let newSpecies = Species(from: response, page: page)
+                    modelContext.insert(newSpecies)
+                }
+            } catch {
+                print("Error saving species to SwiftData: \(error)")
+            }
+        }
+        
+
+        do {
+            try modelContext.save()
+        } catch {
+            print("Error saving to SwiftData: \(error)")
+        }
+    }
+    
+    private func applySearchFilter(localSpecies: [Species]? = nil) {
+        let species = localSpecies ?? (try? modelContext?.fetch(FetchDescriptor<Species>()) ?? [])
+        
+        if searchText.isEmpty {
+            filteredSpecies = species ?? []
+        } else {
+            filteredSpecies = (species ?? []).filter { species in
+                species.commonName.lowercased().contains(searchText.lowercased()) ||
+                species.scientificName.lowercased().contains(searchText.lowercased())
+            }
+        }
     }
     
     private func handleError(_ error: Error) {
-        #if DEBUG
-        print("ViewModel received error: \(error)")
-        #endif
+        errorMessage = error.localizedDescription
+        print("Error fetching species: \(error)")
         
-        if let apiError = error as? APIError {
-            errorMessage = apiError.localizedDescription
-        } else {
-            errorMessage = error.localizedDescription
-        }
-    }
-    
-    func fetchSpecies() {
-        isLoading = true
-        errorMessage = nil
-        
-        apiService.fetchSpecies()
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] completion in
-                guard let self = self else { return }
-                self.isLoading = false
-                
-                if case .failure(let error) = completion {
-                    self.handleError(error)
-                }
-            } receiveValue: { [weak self] speciesArray in
-                guard let self = self else { return }
-                #if DEBUG
-                print("Received species: \(speciesArray.count)")
-                #endif
-                self.species = speciesArray
-            }
-            .store(in: &cancellables)
-    }
-    
-    @MainActor
-    @available(iOS 15.0, *)
-    func fetchSpeciesAsync() async {
-        isLoading = true
-        errorMessage = nil
-        
-        do {
-            let speciesArray = try await apiService.fetchSpeciesAsync()
-            species = speciesArray
-            #if DEBUG
-            print("Async received species: \(speciesArray.count)")
-            #endif
-        } catch {
-            handleError(error)
-        }
-        
-        isLoading = false
+
+        loadLocalData()
     }
     
     private func getStatusDescription(_ code: String) -> String {
@@ -103,7 +190,7 @@ final class SpeciesViewModel: ObservableObject {
         }
     }
     
-    // Helper method to get status code from description
+
     private func getStatusCode(from description: String) -> String? {
         let lowercased = description.lowercased()
         if lowercased.contains("critically") && lowercased.contains("endangered") {
@@ -122,48 +209,5 @@ final class SpeciesViewModel: ObservableObject {
             return "EX"
         }
         return nil
-    }
-    
-    func filteredSpecies() -> [Species] {
-        if searchText.isEmpty {
-            return species
-        }
-        
-        let lowercasedSearchText = searchText.lowercased()
-        
-        let possibleStatusCode = getStatusCode(from: lowercasedSearchText)
-        
-        return species.filter { species in
-            if species.name.lowercased().contains(lowercasedSearchText) {
-                return true
-            }
-            
-            if species.scientificName.lowercased().contains(lowercasedSearchText) {
-                return true
-            }
-            
-            if species.group.lowercased().contains(lowercasedSearchText) {
-                return true
-            }
-            
-            if species.isoCode.lowercased().contains(lowercasedSearchText) {
-                return true
-            }
-            
-            if species.conservationStatus.lowercased().contains(lowercasedSearchText) {
-                return true
-            }
-            
-            let fullStatus = getStatusDescription(species.conservationStatus)
-            if fullStatus.contains(lowercasedSearchText) {
-                return true
-            }
-            
-            if let statusCode = possibleStatusCode, species.conservationStatus.uppercased() == statusCode {
-                return true
-            }
-            
-            return false
-        }
     }
 }

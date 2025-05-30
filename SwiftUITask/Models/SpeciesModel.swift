@@ -6,8 +6,12 @@
 //
 
 import Foundation
+import SwiftData
 
-struct Species: Codable, Identifiable {
+// MARK: - API Response Models
+
+
+struct APISpeciesResponse: Codable, Identifiable {
     let id: Int
     let commonName: String
     let scientificName: String
@@ -27,60 +31,62 @@ struct Species: Codable, Identifiable {
     var name: String {
         return commonName
     }
+}
+
+// MARK: - SwiftData Models
+
+
+@Model
+final class Species {
+    @Attribute(.unique) var id: Int
+    var commonName: String
+    var scientificName: String
+    var group: String
+    var conservationStatus: String
+    var isoCode: String
+    var timestamp: Date
+    var page: Int
     
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(Int.self, forKey: .id)
-        commonName = try container.decode(String.self, forKey: .commonName)
-        scientificName = try container.decode(String.self, forKey: .scientificName)
-        group = try container.decode(String.self, forKey: .group)
-        conservationStatus = try container.decode(String.self, forKey: .conservationStatus)
-        isoCode = try container.decode(String.self, forKey: .isoCode)
+    var name: String {
+        return commonName
+    }
+    
+    init(id: Int, commonName: String, scientificName: String, group: String, conservationStatus: String, isoCode: String, page: Int = 1) {
+        self.id = id
+        self.commonName = commonName
+        self.scientificName = scientificName
+        self.group = group
+        self.conservationStatus = conservationStatus
+        self.isoCode = isoCode
+        self.timestamp = Date()
+        self.page = page
+    }
+    
+
+    convenience init(from response: APISpeciesResponse, page: Int = 1) {
+        self.init(
+            id: response.id,
+            commonName: response.commonName,
+            scientificName: response.scientificName,
+            group: response.group,
+            conservationStatus: response.conservationStatus,
+            isoCode: response.isoCode,
+            page: page
+        )
     }
 }
 
-struct SpeciesResponse: Codable {
-    let data: [Species]
-    let meta: Meta?
-    
-    // Add a custom initializer to create a response with just species data
-    init(data: [Species], meta: Meta?) {
-        self.data = data
-        self.meta = meta
-    }
-    
-    // Add a custom initializer to handle different response structures
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        
-        // Try to decode data as an array of Species
-        do {
-            data = try container.decode([Species].self, forKey: .data)
-        } catch {
-            // If that fails, maybe the response is just an array of Species without a data wrapper
-            do {
-                // Try to decode the entire response as an array of Species directly
-                let species = try decoder.singleValueContainer().decode([Species].self)
-                data = species
-                meta = nil
-                return
-            } catch {
-                // Re-throw the original error if both approaches fail
-                throw error
-            }
-        }
-        
-        // Meta might be optional in some responses
-        meta = try container.decodeIfPresent(Meta.self, forKey: .meta)
-    }
-    
-    enum CodingKeys: String, CodingKey {
-        case data
-        case meta
+// MARK: - Helper Extensions
+
+
+extension Array where Element == APISpeciesResponse {
+    func toSwiftDataModels(page: Int = 1) -> [Species] {
+        return self.map { Species(from: $0, page: page) }
     }
 }
 
-struct Meta: Codable {
+
+struct PaginationMeta: Codable {
     let total: Int
     let perPage: Int
     let currentPage: Int
@@ -91,14 +97,5 @@ struct Meta: Codable {
         case perPage = "per_page"
         case currentPage = "current_page"
         case lastPage = "last_page"
-    }
-    
-    // Add init with default values for optional fields
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        total = try container.decode(Int.self, forKey: .total)
-        perPage = try container.decode(Int.self, forKey: .perPage)
-        currentPage = try container.decode(Int.self, forKey: .currentPage)
-        lastPage = try container.decode(Int.self, forKey: .lastPage)
     }
 }

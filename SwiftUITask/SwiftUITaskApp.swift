@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 
 @main
 struct SwiftUITaskApp: App {
@@ -13,5 +14,6 @@ struct SwiftUITaskApp: App {
         WindowGroup {
             SplashScreen()
         }
+        .modelContainer(for: Species.self)
     }
 }
